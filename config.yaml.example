@@ -1,0 +1,14 @@
+data:
+  sqlite_db_opts:
+    path: validators.db
+alerts:
+  sleep_for: 300
+targets:
+  - beacon_api:
+      network: sepolia
+      endpoint: http://localhost:4000
+    validators:
+      - pubkey: "0xa3dadaba6ece9270cf95211b26a14e6eb09b5d4fbca3d6e47dc498145a46ed161df74ed83a6f81246eea1d0408957dd0"
+    ranges:
+      - start: 101
+        end: 199
