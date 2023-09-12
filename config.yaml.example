@@ -1,14 +1,16 @@
 data:
-  sqlite_db_opts:
-    path: validators.db
+  sqlite_db_opts: # Sqlite database options
+    path: validators.db # Path to sqlite database
 alerts:
-  sleep_for: 300
+  check_balance_for: 3 # Number of state used to compare in the past
+  sleep_for: 300 # Seconds to wait between alerts for the same target
 targets:
   - beacon_api:
-      network: sepolia
-      endpoint: http://localhost:4000
-    validators:
+      network: sepolia # Network name
+      endpoint: http://localhost:4000 # Beacon api endpoint to query for validators status
+    frequency: 12 # Seconds to wait between checks for the targets validators
+    validators: # List of validators to monitor specified by index or pubkey
       - pubkey: "0xa3dadaba6ece9270cf95211b26a14e6eb09b5d4fbca3d6e47dc498145a46ed161df74ed83a6f81246eea1d0408957dd0"
-    ranges:
+    ranges: # List of validators to monitor specified by range of indexes
       - start: 101
         end: 199

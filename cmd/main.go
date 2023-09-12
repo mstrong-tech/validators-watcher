@@ -52,8 +52,11 @@ func main() {
 		logrus.Fatalf("failed to initialize db: %v", err)
 	}
 
+	// Initialize alerts checker
+	var alertsChecker alerts.BalanceAlertsChecker
+
 	// Initialize alerts sender
-	var alertsSender alerts.AlertsSender
+	var alertsSender alerts.SimpleAlertSender
 
 	// Start validators monitoring loops
 	var wg sync.WaitGroup
@@ -73,7 +76,9 @@ func main() {
 			done,
 			target,
 			validatorsDB,
+			completeConfig.Alerts,
 			alertsSender,
+			alertsChecker,
 		)
 	}
 
@@ -85,39 +90,62 @@ func targetLoop(
 	done chan any,
 	target config.ConfigTarget,
 	validatorsDB db.ValidatorsDB,
+	alertsOpts config.ConfigAlerts,
 	alertsSender alerts.AlertsSender,
+	alertsChecker alerts.AlertsChecker,
 ) {
-	firstRound := true
+	waitForRounds := alertsOpts.CheckBalanceFor
 	ticker := time.Tick(time.Duration(target.Frequency) * time.Second)
 	for {
+		var sendAlertMsg string
 		select {
 		case <-done:
+			// Closing loop
 			wg.Done()
 			return
 		case <-ticker:
+			// Loop iteration
 			for _, validator := range target.Validators {
+				// Get actual validator data
 				validatorData, err := target.BeaconApi.GetValidatorData(validator)
 				if err != nil {
 					logrus.Errorf("failed to get validator %s data: %v", validator.Index, err)
 					continue
 				}
-
-				if !firstRound {
-					_, err := validatorsDB.Get(target.BeaconApi.Network, validatorData)
+				// Check alerts if enough rounds have passed
+				if waitForRounds <= 0 {
+					// Get latests states from db
+					latestsStates, err := validatorsDB.GetLatest(target.BeaconApi.Network, validatorData, 3)
 					if err != nil {
 						logrus.Errorf("failed to get validator %s data from db: %v", validator.Index, err)
 						continue
 					}
-
-					// TODO: compare data and send alert if needed
+					// Check alerts
+					sendAlertMsg, err = alertsChecker.CheckAlerts(
+						target.BeaconApi.Network,
+						validatorData,
+						latestsStates,
+					)
+					if err != nil {
+						logrus.Errorf("failed to check alerts: %v", err)
+						continue
+					}
 				}
-
+				// Update db
 				if err := validatorsDB.Update(target.BeaconApi.Network, validatorData); err != nil {
 					logrus.Errorf("failed to update db: %v", err)
 					continue
 				}
 			}
-			firstRound = false
+			if sendAlertMsg != "" {
+				// Send alert
+				if err := alertsSender.SendAlert(sendAlertMsg); err != nil {
+					logrus.Errorf("failed to send alert: %v", err)
+				}
+				time.Sleep(time.Duration(alertsOpts.SleepAlertsFor) * time.Second)
+			} else if waitForRounds > 0 {
+				waitForRounds--
+			}
 		}
 	}
 }

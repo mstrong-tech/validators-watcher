@@ -25,7 +25,8 @@ type ConfigTarget struct {
 }
 
 type ConfigAlerts struct {
-	SleepAlertsFor int `json:"sleep_alerts_for,omitempty" yaml:"sleep_alerts_for,omitempty"`
+	CheckBalanceFor int `json:"check_balance_for,omitempty" yaml:"check_balance_for,omitempty"`
+	SleepAlertsFor  int `json:"sleep_alerts_for,omitempty" yaml:"sleep_alerts_for,omitempty"`
 }
 
 type Config struct {
@@ -36,12 +37,22 @@ type Config struct {
 
 func (config Config) BuildCompleteConfig() Config {
 	var completeConfig Config
+	// Complete data configs
 	completeConfig.Data = config.Data
+	// Complete alerts configs
+	completeConfig.Alerts = config.Alerts
+	if completeConfig.Alerts.CheckBalanceFor <= 0 {
+		completeConfig.Alerts.CheckBalanceFor = DEFAULT_CHECK_BALANCE_FOR
+	}
+	if completeConfig.Alerts.SleepAlertsFor <= 0 {
+		completeConfig.Alerts.SleepAlertsFor = DEFAULT_ALERTS_SLEEP_FOR
+	}
+	// Complete targets configs
 	completeConfig.Targets = make([]ConfigTarget, 0, len(config.Targets))
 	for i, target := range config.Targets {
 		logrus.Debugf("expanding validators ranges for target %d", i)
 		if target.Frequency <= 0 {
-			config.Targets[i].Frequency = 12 // Ethereum mainnet slot time
+			config.Targets[i].Frequency = DEFAULT_FREQUENCY
 		}
 
 		if len(target.Ranges) > 0 {
